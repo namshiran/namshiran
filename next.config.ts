@@ -2,19 +2,15 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Allow images from our own API proxy and other sources
+    // Allow local API images with query strings
+    localPatterns: [
+      {
+        pathname: '/api/image',
+        search: '**',
+      },
+    ],
+    // Allow images from other sources
     remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3000',
-        pathname: '/api/image',
-      },
-      {
-        protocol: 'https',
-        hostname: 'namshiran.vercel.app',
-        pathname: '/api/image',
-      },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
