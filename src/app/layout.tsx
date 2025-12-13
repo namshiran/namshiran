@@ -1,13 +1,5 @@
-import type { Metadata } from "next";
-import { Vazirmatn } from "next/font/google";
-import "./globals.css";
-
-const vazir = Vazirmatn({
-  subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  display: "swap",
-  variable: "--font-vazirmatn",
-});
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: "نمشیران - فروشگاه آنلاین محصولات فشن",
@@ -26,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fa" dir="rtl" className={vazir.variable}>
+    <html lang="fa" dir="rtl">
       <body className="font-sans antialiased">
         {children}
       </body>
