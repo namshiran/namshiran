@@ -1,0 +1,2 @@
+This is a placeholder. You should add a proper 1200x630 PNG image here.
+For now, we'll create one using ImageMagick or similar tool.

@@ -10,8 +10,17 @@ async function getProductData(sku: string, url?: string, offerCode?: string) {
     if (url) queryParams.append('url', url);
     if (offerCode) queryParams.append('offerCode', offerCode);
     
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    // Use localhost in development, production URL otherwise
+    const isDev = process.env.NODE_ENV === 'development';
+    const baseUrl = isDev 
+      ? 'http://localhost:3000' 
+      : (process.env.VERCEL_URL 
+          ? `https://${process.env.VERCEL_URL}` 
+          : 'https://namshiran.vercel.app');
+    
     const apiUrl = `${baseUrl}/api/products/${sku}${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+    
+    console.log('[Metadata] Fetching product from:', apiUrl);
     
     const response = await fetch(apiUrl, { 
       cache: 'no-store',
@@ -19,13 +28,15 @@ async function getProductData(sku: string, url?: string, offerCode?: string) {
     });
     
     if (!response.ok) {
+      console.error('[Metadata] API responded with:', response.status);
       return null;
     }
     
     const data = await response.json();
+    console.log('[Metadata] Product fetched:', data.product?.product_title || 'No title');
     return data.product || null;
   } catch (error) {
-    console.error('Error fetching product for metadata:', error);
+    console.error('[Metadata] Error fetching product:', error);
     return null;
   }
 }
@@ -42,17 +53,39 @@ export async function generateMetadata({
   
   const product = await getProductData(sku, url, offerCode);
 
+  const isDev = process.env.NODE_ENV === 'development';
+  const baseUrl = isDev 
+    ? 'http://localhost:3000' 
+    : (process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'https://namshiran.vercel.app');
+
+  // Default metadata if product not found
   if (!product) {
     return {
-      title: 'محصول یافت نشد | نمشیران',
-      description: 'محصول مورد نظر یافت نشد.',
+      title: 'محصول فشن | نمشیران',
+      description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
+      openGraph: {
+        title: 'محصول فشن | نمشیران',
+        description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
+        images: [
+          {
+            url: `${baseUrl}/og-image.png`,
+            width: 1200,
+            height: 630,
+            alt: 'نمشیران',
+          },
+        ],
+        type: 'website',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: 'محصول فشن | نمشیران',
+        description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
+        images: [`${baseUrl}/og-image.png`],
+      },
     };
   }
-
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://namshiran.vercel.app';
-  const imageUrl = product.image_keys?.[0]
-    ? `${baseUrl}/api/image?key=${encodeURIComponent(product.image_keys[0])}`
-    : `${baseUrl}/og-image.png`;
 
   const price = product.variants?.[0]?.offers?.[0]?.price || 0;
   const salePrice = product.variants?.[0]?.offers?.[0]?.sale_price;
@@ -60,7 +93,10 @@ export async function generateMetadata({
     ? `${new Intl.NumberFormat('en-US').format(salePrice)} درهم` 
     : `${new Intl.NumberFormat('en-US').format(price)} درهم`;
 
-  const description = `${product.brand ? product.brand + ' - ' : ''}${product.product_title}. قیمت: ${priceText}`;
+  const description = `${product.brand ? product.brand + ' - ' : ''}${product.product_title}`;
+
+  // Use dynamic OG image generation
+  const ogImageUrl = `${baseUrl}/api/og?title=${encodeURIComponent(product.product_title)}&description=${encodeURIComponent(product.brand || '')}&price=${encodeURIComponent(priceText)}`;
 
   return {
     title: `${product.product_title} | نمشیران`,
@@ -70,9 +106,9 @@ export async function generateMetadata({
       description: description.substring(0, 160),
       images: [
         {
-          url: imageUrl,
-          width: 800,
-          height: 800,
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
           alt: product.product_title,
         },
       ],
