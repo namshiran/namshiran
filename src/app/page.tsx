@@ -162,7 +162,7 @@ export default function HomePage() {
                   >
                     <div className="relative h-56 bg-gradient-to-br from-gray-50 to-gray-100 rounded-t-3xl overflow-hidden">
                       <Image
-                        src={`https://f.nooncdn.com/p/${product.image_key}.jpg`}
+                        src={`/api/image?key=${encodeURIComponent(product.image_key)}`}
                         alt={product.name}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-500"

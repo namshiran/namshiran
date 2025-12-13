@@ -49,9 +49,10 @@ export async function generateMetadata({
     };
   }
 
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://namshiran.vercel.app';
   const imageUrl = product.image_keys?.[0]
-    ? `https://f.nooncdn.com/p/${product.image_keys[0]}.jpg`
-    : 'https://namshiran.vercel.app/og-image.png';
+    ? `${baseUrl}/api/image?key=${encodeURIComponent(product.image_keys[0])}`
+    : `${baseUrl}/og-image.png`;
 
   const price = product.variants?.[0]?.offers?.[0]?.price || 0;
   const salePrice = product.variants?.[0]?.offers?.[0]?.sale_price;

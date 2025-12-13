@@ -106,7 +106,7 @@ export default function ProductsClient() {
 
   const getImageUrl = (imageKey: string) => {
     if (!imageKey) return '/placeholder.png';
-    return `https://f.nooncdn.com/p/${imageKey}.jpg`;
+    return `/api/image?key=${encodeURIComponent(imageKey)}`;
   };
 
   const formatPrice = (price: number) => {

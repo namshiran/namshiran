@@ -18,7 +18,7 @@ export interface CarouselProduct {
 
 function getNoonImageUrl(imageKey: string) {
   if (!imageKey) return '/placeholder.png';
-  return `https://f.nooncdn.com/p/${imageKey}.jpg`;
+  return `/api/image?key=${encodeURIComponent(imageKey)}`;
 }
 
 function formatPrice(price: number) {

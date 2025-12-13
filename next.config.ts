@@ -2,17 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Next.js 16 prefers `remotePatterns` over the deprecated `domains`.
+    // Allow images from our own API proxy and other sources
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'f.nooncdn.com',
-        pathname: '/**',
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/api/image',
       },
       {
         protocol: 'https',
-        hostname: 'a.nooncdn.com',
-        pathname: '/**',
+        hostname: 'namshiran.vercel.app',
+        pathname: '/api/image',
       },
       {
         protocol: 'https',
