@@ -2,13 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Allow local API images with query strings
+    // Allow local API images with query strings and all local paths
     localPatterns: [
       {
         pathname: '/api/image',
-        search: '**',
+        search: '',
+      },
+      {
+        pathname: '/**',
       },
     ],
+    // Disable static image import optimization for better compatibility
+    unoptimized: false,
     // Allow images from other sources
     remotePatterns: [
       {

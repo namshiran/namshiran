@@ -119,7 +119,7 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: product.product_title,
       description: description.substring(0, 160),
-      images: [imageUrl],
+      images: [ogImageUrl],
     },
   };
 }
