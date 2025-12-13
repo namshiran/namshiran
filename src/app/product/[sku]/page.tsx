@@ -140,8 +140,11 @@ export async function generateMetadata({
     ? product.long_description.substring(0, 160) 
     : `${product.brand ? product.brand + ' - ' : ''}${product.product_title}${priceText ? ' | قیمت: ' + priceText : ''}`;
 
-  // Use dynamic OG image generation with proper encoding
-  const ogImageUrl = `${baseUrl}/api/og?title=${encodeURIComponent(product.product_title)}&description=${encodeURIComponent(shortDesc)}&price=${encodeURIComponent(priceText)}`;
+  // Use actual product image if available, otherwise use dynamic OG generation
+  const productImageKey = product.image_keys?.[0];
+  const ogImageUrl = productImageKey
+    ? `${baseUrl}/api/image?key=${encodeURIComponent(productImageKey)}`
+    : `${baseUrl}/api/og?title=${encodeURIComponent(product.product_title)}&description=${encodeURIComponent(shortDesc)}&price=${encodeURIComponent(priceText)}`;
   
   const productUrl = `${baseUrl}/product/${sku}${url ? `?url=${url}` : ''}${offerCode ? `&offerCode=${offerCode}` : ''}`;
 
