@@ -57,17 +57,40 @@ export default function ProductsClient() {
       const url = categoryEndpoint
         ? `/api/products?page=${page}&category=${encodeURIComponent(categoryEndpoint)}`
         : `/api/products?page=${page}`;
-      const response = await fetch(url);
+      
+      console.log('[Client] Fetching products from:', url);
+      
+      const response = await fetch(url, {
+        cache: 'no-store',
+      });
+      
+      console.log('[Client] Response status:', response.status);
+      
       const data: ApiResponse = await response.json();
+      
+      console.log('[Client] Received data:', { 
+        hits: data.hits?.length || 0, 
+        nbPages: data.nbPages, 
+        nbHits: data.nbHits,
+        hasError: 'error' in data 
+      });
 
-      if (data.hits) {
+      if ('error' in data) {
+        setError(`خطا: ${(data as any).message || 'مشکل در دریافت محصولات'}`);
+        setProducts([]);
+        setTotalPages(0);
+        setTotalProducts(0);
+      } else if (data.hits) {
         setProducts(data.hits);
         setTotalPages(data.nbPages);
         setTotalProducts(data.nbHits);
+      } else {
+        setError('داده‌های دریافتی نامعتبر است');
       }
     } catch (err) {
-      setError('خطا در بارگذاری محصولات');
-      console.error('Error fetching products:', err);
+      const errorMessage = err instanceof Error ? err.message : 'خطای ناشناخته';
+      setError(`خطا در بارگذاری محصولات: ${errorMessage}`);
+      console.error('[Client] Error fetching products:', err);
     } finally {
       setLoading(false);
     }
