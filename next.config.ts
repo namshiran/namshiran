@@ -2,16 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
-    // Turbopack/Next Image can be picky about remote host allow-lists.
-    // Keep both `domains` and `remotePatterns` for maximum compatibility.
-    domains: [
-      'f.nooncdn.com',
-      'a.nooncdn.com',
-      'images.unsplash.com',
-      'source.unsplash.com',
-      'plus.unsplash.com',
-      'images.pexels.com',
-    ],
+    // Next.js 16 prefers `remotePatterns` over the deprecated `domains`.
     remotePatterns: [
       {
         protocol: 'https',
