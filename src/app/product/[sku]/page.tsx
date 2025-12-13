@@ -4,6 +4,10 @@ import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import ProductClient from './ProductClient';
 
+// Force dynamic rendering for metadata
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function getProductData(sku: string, url?: string, offerCode?: string) {
   try {
     const queryParams = new URLSearchParams();
@@ -22,21 +26,40 @@ async function getProductData(sku: string, url?: string, offerCode?: string) {
     
     console.log('[Metadata] Fetching product from:', apiUrl);
     
-    const response = await fetch(apiUrl, { 
-      cache: 'no-store',
-      next: { revalidate: 0 }
-    });
+    // Set shorter timeout for metadata fetch
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
     
-    if (!response.ok) {
-      console.error('[Metadata] API responded with:', response.status);
-      return null;
+    try {
+      const response = await fetch(apiUrl, { 
+        signal: controller.signal,
+        cache: 'no-store',
+        next: { revalidate: 0 }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        console.error('[Metadata] API responded with:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (data.error || !data.product) {
+        console.error('[Metadata] No product in response:', data.error || 'No product field');
+        return null;
+      }
+      
+      console.log('[Metadata] Product fetched:', data.product?.product_title || 'No title');
+      return data.product;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      throw fetchError;
     }
-    
-    const data = await response.json();
-    console.log('[Metadata] Product fetched:', data.product?.product_title || 'No title');
-    return data.product || null;
   } catch (error) {
-    console.error('[Metadata] Error fetching product:', error);
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[Metadata] Error fetching product:', errorMsg);
     return null;
   }
 }
@@ -56,20 +79,27 @@ export async function generateMetadata({
   // Always use production URL for OG images (important for link previews)
   const baseUrl = 'https://namshiran.vercel.app';
 
-  // Default metadata if product not found - show SKU to help identify the product
+  // Default metadata if product not found - use URL slug to create a better title
   if (!product) {
-    console.log(`[Metadata] Product not found for SKU: ${sku}`);
-    const defaultTitle = `محصول ${sku}`;
-    const defaultOgUrl = `${baseUrl}/api/og?title=${encodeURIComponent(defaultTitle)}&description=${encodeURIComponent('نمشیران - فروشگاه فشن')}`;
+    console.log(`[Metadata] Product not found for SKU: ${sku}, URL: ${url || 'none'}`);
+    
+    // Try to create a readable title from the URL slug
+    const productName = url 
+      ? url.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      : `محصول ${sku.substring(0, 10)}`;
+    
+    const defaultTitle = productName;
+    const defaultDesc = 'خرید محصول فشن با بهترین قیمت از فروشگاه آنلاین نمشیران';
+    const defaultOgUrl = `${baseUrl}/api/og?title=${encodeURIComponent(defaultTitle)}&description=${encodeURIComponent('نمشیران')}`;
     
     return {
       title: `${defaultTitle} | نمشیران`,
-      description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
+      description: defaultDesc,
       metadataBase: new URL(baseUrl),
       openGraph: {
         title: `${defaultTitle} | نمشیران`,
-        description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
-        url: `${baseUrl}/product/${sku}`,
+        description: defaultDesc,
+        url: `${baseUrl}/product/${sku}${url ? `?url=${url}` : ''}`,
         siteName: 'نمشیران',
         locale: 'fa_IR',
         type: 'website',
@@ -85,7 +115,7 @@ export async function generateMetadata({
       twitter: {
         card: 'summary_large_image',
         title: `${defaultTitle} | نمشیران`,
-        description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
+        description: defaultDesc,
         images: [defaultOgUrl],
         creator: '@namshiran',
       },
