@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Use Node.js runtime for better compatibility
 export const runtime = 'nodejs';
-export const maxDuration = 60; // 60 seconds for Vercel Pro
+export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
 // Free proxy services - rotate if one fails
@@ -13,7 +13,7 @@ const PROXY_SERVICES = [
 ];
 
 // Timeout helper function
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 25000) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 10000) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -30,14 +30,13 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   }
 }
 
-// Try fetching through multiple proxies
-async function fetchThroughProxy(targetUrl: string, timeoutMs: number = 25000) {
-  let lastError: Error | null = null;
+// Try fetching through multiple proxies - race them for speed
+async function fetchThroughProxy(targetUrl: string, timeoutMs: number = 10000) {
+  const fetchAttempts: Promise<Response>[] = [];
 
-  // Try direct fetch first
-  try {
-    console.log('[API] Trying direct fetch...');
-    const response = await fetchWithTimeout(
+  // Direct fetch
+  fetchAttempts.push(
+    fetchWithTimeout(
       targetUrl,
       {
         method: 'GET',
@@ -51,25 +50,23 @@ async function fetchThroughProxy(targetUrl: string, timeoutMs: number = 25000) {
         cache: 'no-store',
       },
       timeoutMs
-    );
-    
-    if (response.ok) {
-      console.log('[API] Direct fetch succeeded');
-      return response;
-    }
-  } catch (error) {
-    console.log('[API] Direct fetch failed:', error instanceof Error ? error.message : 'Unknown error');
-    lastError = error instanceof Error ? error : new Error('Direct fetch failed');
-  }
+    ).then(res => {
+      if (res.ok) {
+        console.log('[API] Direct fetch succeeded');
+        return res;
+      }
+      throw new Error(`Direct fetch returned ${res.status}`);
+    }).catch(err => {
+      console.log('[API] Direct fetch failed:', err.message);
+      throw err;
+    })
+  );
 
-  // Try each proxy service
-  for (let i = 0; i < PROXY_SERVICES.length; i++) {
-    const proxyUrl = PROXY_SERVICES[i];
-    try {
-      console.log(`[API] Trying proxy ${i + 1}/${PROXY_SERVICES.length}: ${proxyUrl}`);
-      const fullUrl = proxyUrl + encodeURIComponent(targetUrl);
-      
-      const response = await fetchWithTimeout(
+  // Add proxy attempts
+  PROXY_SERVICES.forEach((proxyUrl, i) => {
+    const fullUrl = proxyUrl + encodeURIComponent(targetUrl);
+    fetchAttempts.push(
+      fetchWithTimeout(
         fullUrl,
         {
           method: 'GET',
@@ -80,21 +77,21 @@ async function fetchThroughProxy(targetUrl: string, timeoutMs: number = 25000) {
           cache: 'no-store',
         },
         timeoutMs
-      );
+      ).then(res => {
+        if (res.ok) {
+          console.log(`[API] Proxy ${i + 1} succeeded`);
+          return res;
+        }
+        throw new Error(`Proxy ${i + 1} returned ${res.status}`);
+      }).catch(err => {
+        console.log(`[API] Proxy ${i + 1} failed:`, err.message);
+        throw err;
+      })
+    );
+  });
 
-      if (response.ok) {
-        console.log(`[API] Proxy ${i + 1} succeeded`);
-        return response;
-      }
-      
-      console.log(`[API] Proxy ${i + 1} returned status: ${response.status}`);
-    } catch (error) {
-      console.log(`[API] Proxy ${i + 1} failed:`, error instanceof Error ? error.message : 'Unknown error');
-      lastError = error instanceof Error ? error : new Error(`Proxy ${i + 1} failed`);
-    }
-  }
-
-  throw lastError || new Error('All proxy attempts failed');
+  // Race all requests - return the first successful one
+  return Promise.any(fetchAttempts);
 }
 
 export async function GET(request: NextRequest) {
@@ -137,7 +134,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(data, {
       headers: {
-        'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
       },
     });
   } catch (error) {
