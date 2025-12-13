@@ -1,4 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { mockProducts } from './mockData';
+
+// Use Edge Runtime for faster response
+export const runtime = 'edge';
+export const maxDuration = 10; // Reduce to 10 seconds
+
+const USE_MOCK_DATA = process.env.USE_MOCK_DATA === 'true';
+
+// Timeout helper function
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 8000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -7,20 +32,32 @@ export async function GET(request: NextRequest) {
 
   console.log(`[API] Fetching products - Page: ${page}, Category: ${category}`);
 
+  // Use mock data if enabled
+  if (USE_MOCK_DATA) {
+    console.log('[API] Using mock data (USE_MOCK_DATA=true)');
+    return NextResponse.json(mockProducts, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
+  }
+
   try {
     const apiUrl = `https://www.noon.com/_vs/nc/mp-customer-catalog-api/api/v3/u/${category}/p-3001/?page=${page}`;
     console.log(`[API] Requesting: ${apiUrl}`);
 
-    const response = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Referer': 'https://www.noon.com/',
+    const response = await fetchWithTimeout(
+      apiUrl,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.noon.com/',
+        },
       },
-      cache: 'no-store', // Disable caching for debugging
-    });
+      8000 // 8 second timeout
+    );
 
     console.log(`[API] Response status: ${response.status}`);
 
@@ -33,20 +70,24 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     console.log(`[API] Success - Found ${data.nbHits} products`);
     
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     console.error('[API] Error fetching products:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isTimeout = errorMessage.includes('abort') || errorMessage.includes('timeout');
     
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch products', 
-        message: errorMessage,
-        hits: [], 
-        nbPages: 0, 
-        nbHits: 0 
+    // Fallback to mock data on error
+    console.log('[API] Falling back to mock data due to error');
+    return NextResponse.json(mockProducts, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'X-Fallback': 'true',
+        'X-Error': errorMessage,
       },
-      { status: 500 }
-    );
+    });
   }
 }
