@@ -53,73 +53,106 @@ export async function generateMetadata({
   
   const product = await getProductData(sku, url, offerCode);
 
-  const isDev = process.env.NODE_ENV === 'development';
-  const baseUrl = isDev 
-    ? 'http://localhost:3000' 
-    : (process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'https://namshiran.vercel.app');
+  // Always use production URL for OG images (important for link previews)
+  const baseUrl = 'https://namshiran.vercel.app';
 
-  // Default metadata if product not found
+  // Default metadata if product not found - show SKU to help identify the product
   if (!product) {
+    console.log(`[Metadata] Product not found for SKU: ${sku}`);
+    const defaultTitle = `محصول ${sku}`;
+    const defaultOgUrl = `${baseUrl}/api/og?title=${encodeURIComponent(defaultTitle)}&description=${encodeURIComponent('نمشیران - فروشگاه فشن')}`;
+    
     return {
-      title: 'محصول فشن | نمشیران',
-      description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
+      title: `${defaultTitle} | نمشیران`,
+      description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
+      metadataBase: new URL(baseUrl),
       openGraph: {
-        title: 'محصول فشن | نمشیران',
-        description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
+        title: `${defaultTitle} | نمشیران`,
+        description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
+        url: `${baseUrl}/product/${sku}`,
+        siteName: 'نمشیران',
+        locale: 'fa_IR',
+        type: 'website',
         images: [
           {
-            url: `${baseUrl}/og-image.png`,
+            url: defaultOgUrl,
             width: 1200,
             height: 630,
-            alt: 'نمشیران',
+            alt: `${defaultTitle} | نمشیران`,
           },
         ],
-        type: 'website',
       },
       twitter: {
         card: 'summary_large_image',
-        title: 'محصول فشن | نمشیران',
-        description: 'خرید آنلاین محصولات فشن و لباس با بهترین قیمت از نمشیران',
-        images: [`${baseUrl}/og-image.png`],
+        title: `${defaultTitle} | نمشیران`,
+        description: 'مشاهده جزئیات محصول در فروشگاه آنلاین نمشیران',
+        images: [defaultOgUrl],
+        creator: '@namshiran',
       },
     };
   }
 
+  console.log(`[Metadata] Product found: ${product.product_title}`);
+
   const price = product.variants?.[0]?.offers?.[0]?.price || 0;
   const salePrice = product.variants?.[0]?.offers?.[0]?.sale_price;
   const priceText = salePrice 
-    ? `${new Intl.NumberFormat('en-US').format(salePrice)} درهم` 
-    : `${new Intl.NumberFormat('en-US').format(price)} درهم`;
+    ? `${new Intl.NumberFormat('fa-IR').format(salePrice)} درهم` 
+    : price > 0 
+      ? `${new Intl.NumberFormat('fa-IR').format(price)} درهم`
+      : '';
 
-  const description = `${product.brand ? product.brand + ' - ' : ''}${product.product_title}`;
+  const shortDesc = product.brand 
+    ? `${product.brand} | ${priceText}` 
+    : priceText;
+  
+  const longDesc = product.long_description 
+    ? product.long_description.substring(0, 160) 
+    : `${product.brand ? product.brand + ' - ' : ''}${product.product_title}${priceText ? ' | قیمت: ' + priceText : ''}`;
 
-  // Use dynamic OG image generation
-  const ogImageUrl = `${baseUrl}/api/og?title=${encodeURIComponent(product.product_title)}&description=${encodeURIComponent(product.brand || '')}&price=${encodeURIComponent(priceText)}`;
+  // Use dynamic OG image generation with proper encoding
+  const ogImageUrl = `${baseUrl}/api/og?title=${encodeURIComponent(product.product_title)}&description=${encodeURIComponent(shortDesc)}&price=${encodeURIComponent(priceText)}`;
+  
+  const productUrl = `${baseUrl}/product/${sku}${url ? `?url=${url}` : ''}${offerCode ? `&offerCode=${offerCode}` : ''}`;
 
   return {
     title: `${product.product_title} | نمشیران`,
-    description: description.substring(0, 160),
+    description: longDesc,
+    metadataBase: new URL(baseUrl),
+    keywords: [
+      product.product_title,
+      product.brand,
+      'خرید آنلاین',
+      'فشن',
+      'لباس',
+      'نمشیران',
+    ].filter(Boolean),
     openGraph: {
       title: product.product_title,
-      description: description.substring(0, 160),
+      description: longDesc,
+      url: productUrl,
+      siteName: 'نمشیران',
+      locale: 'fa_IR',
+      type: 'website',
       images: [
         {
           url: ogImageUrl,
           width: 1200,
           height: 630,
           alt: product.product_title,
+          type: 'image/png',
         },
       ],
-      type: 'website',
-      siteName: 'نمشیران',
     },
     twitter: {
       card: 'summary_large_image',
       title: product.product_title,
-      description: description.substring(0, 160),
+      description: longDesc,
       images: [ogImageUrl],
+      creator: '@namshiran',
+    },
+    alternates: {
+      canonical: productUrl,
     },
   };
 }
